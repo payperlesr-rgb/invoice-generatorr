@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payperles - Financial Consultant Invoice Generator</title>
+<style>
+    /* Reset and Base Styles */
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { margin: 0; background-color: #f4f7f6; color: #333; display: flex; flex-direction: column; height: 100vh; }
+    h1, h2, h3 { margin: 0 0 10px 0; color: #1a365d; }
+
+    /* Layout */
+    .app-container { display: flex; flex: 1; overflow: hidden; height: 100vh; }
+    .editor-panel { width: 400px; background: #fff; padding: 25px; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.05); z-index: 10; }
+    .preview-panel { flex: 1; padding: 40px; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; }
+
+    /* Editor Form Elements */
+    .section { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+    .section-title { font-size: 16px; background: #f0f4f8; padding: 8px 12px; border-radius: 4px; margin-bottom: 15px; display: flex; align-items: center; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 11px; font-weight: 700; margin-bottom: 5px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
+    input, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; transition: border-color 0.2s; }
+    input:focus, textarea:focus { outline: none; border-color: #1a365d; }
+    textarea { resize: vertical; min-height: 70px; }
+    
+    .btn { background: #1a365d; color: #fff; border: none; padding: 12px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; transition: background 0.3s; margin-bottom: 10px;}
+    .btn:hover { background: #2a5298; }
+    .btn-secondary { background: #e2e8f0; color: #1a365d; }
+    .btn-secondary:hover { background: #cbd5e1; }
+
+    /* Line Items Editor */
+    .item-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; background: #f8fafc; padding: 10px; border-radius: 4px;}
+    .item-row > div { flex: 1; }
+    .item-row .desc-col { flex: 2; }
+    .remove-btn { background: #e53e3e; padding: 10px; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 22px; width: auto;}
+
+    /* Invoice Preview (The Document) */
+    .invoice-paper { background: #fff; width: 210mm; min-height: 297mm; padding: 20mm; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative;}
+    .inv-header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a365d; padding-bottom: 25px; margin-bottom: 35px; }
+    .inv-brand h1 { font-size: 36px; color: #1a365d; margin: 0; letter-spacing: 1px; text-transform: uppercase;}
+    .inv-brand p { color: #4a5568; font-size: 15px; margin: 5px 0 0 0; font-weight: 500; }
+    .inv-title { text-align: right; }
+    .inv-title h2 { font-size: 24px; color: #2d3748; margin-bottom: 10px; letter-spacing: 2px; }
+    .inv-meta table { width: 100%; font-size: 14px; }
+    .inv-meta td { padding: 3px 0; }
+    .inv-meta td:first-child { text-align: right; color: #718096; padding-right: 15px; }
+    .inv-meta td:last-child { font-weight: 600; text-align: right; }
+
+    .inv-body { display: flex; justify-content: space-between; margin-bottom: 40px; }
+    .inv-section { width: 45%; }
+    .inv-section h3 { font-size: 14px; text-transform: uppercase; color: #718096; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px; letter-spacing: 1px; }
+    .inv-section p { white-space: pre-wrap; font-size: 14px; line-height: 1.6; margin: 0; color: #2d3748; }
+
+    table.inv-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+    .inv-table th, .inv-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    .inv-table th { background: #f7fafc; font-weight: 600; color: #4a5568; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;}
+    .inv-table th.right, .inv-table td.right { text-align: right; }
+
+    .inv-summary-container { display: flex; justify-content: space-between; }
+    .inv-payment-info { width: 50%; font-size: 13px; color: #4a5568; line-height: 1.6; }
+    .inv-payment-info h3 { font-size: 14px; text-transform: uppercase; color: #718096; margin-bottom: 8px;}
+    .inv-totals { width: 40%; }
+    .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; color: #4a5568; }
+    .total-row.grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #1a365d; padding-top: 12px; margin-top: 5px; color: #1a365d; }
+
+    .inv-footer { position: absolute; bottom: 20mm; left: 20mm; right: 20mm; text-align: center; font-size: 12px; color: #a0aec0; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+
+    /* Print Styles */
+    @media print {
+        body { background: #fff; height: auto; }
+        .editor-panel { display: none; }
+        .app-container { overflow: visible; display: block;}
+        .preview-panel { padding: 0; display: block; overflow: visible; }
+        .invoice-paper { box-shadow: none; width: 100%; min-height: auto; padding: 0; }
+        .inv-footer { position: fixed; bottom: 0; left: 0; right: 0; }
+    }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- EDITOR PANEL -->
+    <div class="editor-panel">
+        <h2>Invoice Setup</h2>
+        <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+        <div class="section">
+            <div class="section-title">1. Your Firm Details</div>
+            <div class="form-group">
+                <label>Firm Name</label>
+                <input type="text" id="firmName" value="Payperles" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Tagline / Profession</label>
+                <input type="text" id="firmTagline" value="Financial Consulting" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Your Contact Details & Address</label>
+                <textarea id="firmAddress" oninput="updateInvoice()">123 Business Avenue
+Suite 400
+City, State 12345
+Email: contact@payperles.com
+Phone: +1 (555) 123-4567</textarea>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">2. Client Details (Billed To)</div>
+            <div class="form-group">
+                <label>Client Name / Company</label>
+                <input type="text" id="clientName" value="Client Company LLC" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Client Address & Info</label>
+                <textarea id="clientAddress" oninput="updateInvoice()">456 Corporate Blvd
+Floor 2
+Client City, State 67890
+Attn: Accounts Payable</textarea>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">3. Invoice Meta</div>
+            <div class="form-group">
+                <label>Invoice Number</label>
+                <input type="text" id="invNumber" value="INV-2023-001" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Date of Issue</label>
+                <input type="date" id="invDate" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Due Date</label>
+                <input type="date" id="dueDate" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Currency Symbol</label>
+                <input type="text" id="currencySymbol" value="$" oninput="updateInvoice()">
+            </div>
+            <div class="form-group">
+                <label>Notify This Email When Invoice Is Generated</label>
+                <input type="email" id="ownerEmail" value="" placeholder="owner@yourbusiness.com" oninput="updateInvoice()">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">4. Line Items</div>
+            <div id="itemsContainer">
+                <!-- Items injected here by JS -->
+            </div>
+            <button class="btn btn-secondary" onclick="addItem()">+ Add Line Item</button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">5. Payment & Notes</div>
+            <div class="form-group">
+                <label>Payment Instructions (Bank Details)</label>
+                <textarea id="paymentInfo" oninput="updateInvoice()">Bank: First National Bank
+Account Name: Payperles LLC
+Account No: 1234567890
+Routing No: 098765432
+Terms: Net 30 days.</textarea>
+            </div>
+            <div class="form-group">
+                <label>Footer Note</label>
+                <input type="text" id="footerNote" value="Thank you for your business." oninput="updateInvoice()">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">6. Send Invoice</div>
+            <button class="btn" onclick="emailInvoice()">📧 Notify Business Owner</button>
+        </div>
+    </div>
+
+    <!-- PREVIEW PANEL -->
+    <div class="preview-panel">
+        <div class="invoice-paper">
+            <div class="inv-header">
+                <div class="inv-brand">
+                    <h1 id="outFirmName">Payperles</h1>
+                    <p id="outFirmTagline">Financial Consulting</p>
+                </div>
+                <div class="inv-title">
+                    <h2>INVOICE</h2>
+                    <div class="inv-meta">
+                        <table>
+                            <tr><td>Invoice No:</td><td id="outInvNumber">INV-2023-001</td></tr>
+                            <tr><td>Date:</td><td id="outInvDate">Oct 24, 2023</td></tr>
+                            <tr><td>Due Date:</td><td id="outDueDate">Nov 24, 2023</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inv-body">
+                <div class="inv-section">
+                    <h3>From</h3>
+                    <p id="outFirmAddress">123 Business Avenue...</p>
+                </div>
+                <div class="inv-section">
+                    <h3>Billed To</h3>
+                    <p><strong id="outClientName">Client Company LLC</strong><br><span id="outClientAddress">456 Corporate Blvd...</span></p>
+                </div>
+            </div>
+
+            <table class="inv-table">
+                <thead>
+                    <tr>
+                        <th>Description of Service</th>
+                        <th class="right">Hrs/Qty</th>
+                        <th class="right">Rate</th>
+                        <th class="right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="outItems">
+                    <!-- Dynamic Items -->
+                </tbody>
+            </table>
+
+            <div class="inv-summary-container">
+                <div class="inv-payment-info">
+                    <h3>Payment Information</h3>
+                    <p id="outPaymentInfo">Bank: First National Bank...</p>
+                </div>
+                <div class="inv-totals">
+                    <div class="total-row">
+                        <span>Subtotal:</span>
+                        <span id="outSubtotal">$0.00</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Total Due:</span>
+                        <span id="outTotal">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inv-footer" id="outFooterNote">
+                Thank you for your business.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Set default dates
+    document.getElementById('invDate').valueAsDate = new Date();
+    let nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    document.getElementById('dueDate').valueAsDate = nextMonth;
+
+    let items = [
+        { desc: "Financial Strategy Session", qty: 1, rate: 500 },
+        { desc: "Q3 Portfolio Analysis", qty: 4, rate: 150 }
+    ];
+
+    function renderItemsEditor() {
+        const container = document.getElementById('itemsContainer');
+        container.innerHTML = '';
+        items.forEach((item, index) => {
+            container.innerHTML += `
+                <div class="item-row">
+                    <div class="desc-col">
+                        <label>Description</label>
+                        <input type="text" value="${item.desc}" oninput="updateItem(${index}, 'desc', this.value)">
+                    </div>
+                    <div>
+                        <label>Qty/Hrs</label>
+                        <input type="number" min="0" step="0.5" value="${item.qty}" oninput="updateItem(${index}, 'qty', this.value)">
+                    </div>
+                    <div>
+                        <label>Rate</label>
+                        <input type="number" min="0" step="0.01" value="${item.rate}" oninput="updateItem(${index}, 'rate', this.value)">
+                    </div>
+                    <button class="remove-btn" onclick="removeItem(${index})" title="Remove Item">X</button>
+                </div>
+            `;
+        });
+        updateInvoice();
+    }
+
+    function updateItem(index, field, value) {
+        items[index][field] = field === 'desc' ? value : parseFloat(value) || 0;
+        updateInvoice();
+    }
+
+    function addItem() {
+        items.push({ desc: "", qty: 1, rate: 0 });
+        renderItemsEditor();
+    }
+
+    function removeItem(index) {
+        items.splice(index, 1);
+        renderItemsEditor();
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return "";
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function updateInvoice() {
+        // Sync basic text fields
+        document.getElementById('outFirmName').innerText = document.getElementById('firmName').value;
+        document.getElementById('outFirmTagline').innerText = document.getElementById('firmTagline').value;
+        document.getElementById('outFirmAddress').innerText = document.getElementById('firmAddress').value;
+        
+        document.getElementById('outClientName').innerText = document.getElementById('clientName').value;
+        document.getElementById('outClientAddress').innerText = document.getElementById('clientAddress').value;
+        
+        document.getElementById('outInvNumber').innerText = document.getElementById('invNumber').value;
+        document.getElementById('outInvDate').innerText = formatDate(document.getElementById('invDate').value);
+        document.getElementById('outDueDate').innerText = formatDate(document.getElementById('dueDate').value);
+        
+        document.getElementById('outPaymentInfo').innerText = document.getElementById('paymentInfo').value;
+        document.getElementById('outFooterNote').innerText = document.getElementById('footerNote').value;
+
+        const currency = document.getElementById('currencySymbol').value;
+
+        // Sync items and totals
+        let outItemsHtml = '';
+        let total = 0;
+
+        items.forEach(item => {
+            const amount = item.qty * item.rate;
+            total += amount;
+            outItemsHtml += `
+                <tr>
+                    <td>${item.desc}</td>
+                    <td class="right">${item.qty}</td>
+                    <td class="right">${currency}${item.rate.toFixed(2)}</td>
+                    <td class="right">${currency}${amount.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        document.getElementById('outItems').innerHTML = outItemsHtml;
+        document.getElementById('outSubtotal').innerText = `${currency}${total.toFixed(2)}`;
+        document.getElementById('outTotal').innerText = `${currency}${total.toFixed(2)}`;
+    }
+
+    function emailInvoice() {
+        const email = document.getElementById('ownerEmail').value.trim();
+        if (!email) {
+            alert('Please enter the notification email address in the "Invoice Meta" section first.');
+            return;
+        }
+
+        const firmName = document.getElementById('firmName').value;
+        const invNumber = document.getElementById('invNumber').value;
+        const invDate = formatDate(document.getElementById('invDate').value);
+        const dueDate = formatDate(document.getElementById('dueDate').value);
+        const clientName = document.getElementById('clientName').value;
+        const currency = document.getElementById('currencySymbol').value;
+
+        let total = 0;
+        let itemLines = '';
+        items.forEach(item => {
+            const amount = item.qty * item.rate;
+            total += amount;
+            itemLines += `- ${item.desc}: ${item.qty} x ${currency}${item.rate.toFixed(2)} = ${currency}${amount.toFixed(2)}\n`;
+        });
+
+        const subject = `New Invoice Generated: ${invNumber} (${clientName})`;
+
+        const body =
+`A new invoice has been generated.
+
+Invoice Number: ${invNumber}
+Client: ${clientName}
+Date of Issue: ${invDate}
+Due Date: ${dueDate}
+
+Line Items:
+${itemLines}
+Total Due: ${currency}${total.toFixed(2)}
+
+Payment Instructions:
+${document.getElementById('paymentInfo').value}`;
+
+        const mailtoLink = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+    }
+
+    // Initialize
+    renderItemsEditor();
+</script>
+</body>
+</html>
